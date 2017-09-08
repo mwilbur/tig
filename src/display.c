@@ -72,8 +72,36 @@ open_external_viewer(const char *argv[], const char *dir, bool silent, bool conf
 			return false;
 		}
 	} else if (silent || is_script_executing()) {
-		ok = io_run_bg(argv, dir);
-
+		char const * arg, *filename;
+		bool redirect_stdout_to_file = false; 
+		for(int i=0;;i++) {
+			arg=argv[i];
+			if(arg==NULL) {
+				break;
+			}
+			else if(strcmp(arg,">")==0) {
+				redirect_stdout_to_file = true;
+				argv[i] = NULL;
+				filename = argv[i+1];
+				break;
+			}
+		}
+		if (redirect_stdout_to_file) {
+			int rw_mode = O_RDWR | S_IRUSR | S_IWUSR;
+			int apfd = open(filename, O_CREAT | rw_mode);
+			if (apfd < 0)  {
+				if (errno == EEXIST) {
+					apfd = open(filename, O_TRUNC | rw_mode);
+					if (apfd > 0) {
+						ok = io_run_append(argv, apfd);
+					}
+				}
+			} else {
+				ok=false;
+			}
+		} else {
+			ok = io_run_bg(argv, dir);
+		}
 	} else {
 		clear();
 		refresh();
